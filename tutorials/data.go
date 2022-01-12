@@ -13,9 +13,7 @@ type Tutorial struct {
 var (
 	// Tutorials defines the metadata for each tutorial
 	Tutorials = map[string]Tutorial{
-		"Post": {"Post",
-			"post request",
-			nil},
+
 		"Base64": {"Encode/Decode",
 			"Use Base64 encode/decode text.",
 			encodeTab,
@@ -28,9 +26,6 @@ var (
 
 	// TutorialIndex  defines how our tutorials should be laid out in the index tree
 	TutorialIndex = map[string][]string{
-		"":            {"Base64","Sign","Post"},
-		"collections": {"list", "table", "tree"},
-		"containers":  {"apptabs", "border", "box", "center", "doctabs", "grid", "scroll", "split"},
-		"widgets":     {"accordion", "button", "card", "entry", "form", "input", "progress", "text", "toolbar"},
+		"": {"Base64", "Sign"},
 	}
 )

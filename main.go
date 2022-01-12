@@ -3,8 +3,10 @@ package main
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"gui/bundle"
 	"gui/tutorials"
 	"log"
+	"os"
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
@@ -17,8 +19,10 @@ const preferenceCurrentTutorial = "currentTutorial"
 var topWindow fyne.Window
 
 func main() {
+
+	_ = os.Setenv("FYNE_FONT", "D:\\Users\\project\\SourceHanSerifCN-SemiBold.ttf")
 	a := app.NewWithID("cpcn.com")
-	a.SetIcon(theme.FyneLogo())
+	a.SetIcon(bundle.Cpcnlogo())
 	logLifecycle(a)
 	w := a.NewWindow("CPCN Test")
 	topWindow = w
@@ -75,7 +79,6 @@ func logLifecycle(a fyne.App) {
 		log.Println("Lifecycle: Exited Foreground")
 	})
 }
-
 
 func makeNav(setTutorial func(tutorial tutorials.Tutorial), loadPrevious bool) fyne.CanvasObject {
 	a := fyne.CurrentApp()

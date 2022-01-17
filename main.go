@@ -21,6 +21,10 @@ var topWindow fyne.Window
 func main() {
 
 	_ = os.Setenv("FYNE_FONT", "D:\\Users\\project\\SourceHanSerifCN-SemiBold.ttf")
+	loadui()
+}
+
+func loadui() {
 	a := app.NewWithID("cpcn.com")
 	a.SetIcon(bundle.Cpcnlogo())
 	logLifecycle(a)

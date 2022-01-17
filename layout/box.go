@@ -1,7 +1,7 @@
 package layout
 
 import (
-    "fyne.io/fyne/v2"
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 )
@@ -88,7 +88,7 @@ func (g *boxLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 		extraCell = extra / float32(len(spacers))
 	}
 
-	for _, child := range objects {
+	for index, child := range objects {
 		if !child.Visible() {
 			continue
 		}
@@ -100,12 +100,11 @@ func (g *boxLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 			if width < child.MinSize().Width {
 				width = child.MinSize().Width
 			}
-		}else {
+		} else {
 			if height < child.MinSize().Height {
 				height = child.MinSize().Height
 			}
 		}
-
 
 		if g.isSpacer(child) {
 			if g.horizontal {
@@ -119,7 +118,12 @@ func (g *boxLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 
 		if g.horizontal {
 			x += theme.Padding() + width
-			child.Resize(fyne.NewSize(width, size.Height))
+			// 如果是最后一个控件，则占满剩余控件
+			if index == len(objects)-1 {
+				child.Resize(fyne.NewSize(size.Width-x+width, size.Height))
+			} else {
+				child.Resize(fyne.NewSize(width, size.Height))
+			}
 		} else {
 			y += theme.Padding() + height
 			child.Resize(fyne.NewSize(size.Width, height))

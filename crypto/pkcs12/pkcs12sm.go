@@ -4,13 +4,14 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"gui/crypto/sm2"
 	"gui/crypto/sm3"
 	"gui/crypto/sm4"
 	"gui/crypto/x509"
+	"io/ioutil"
 	"log"
 	"math/big"
+	"os"
 )
 
 type smPdu struct {
@@ -30,7 +31,7 @@ type publicKeyContent struct {
 	Content asn1.RawValue
 }
 
-func Decode(smData []byte, password string) (privateKey *sm2.PrivateKey, certificate *x509.Certificate, err error) {
+func DecodeSm2(smData []byte, password string) (privateKey *sm2.PrivateKey, certificate *x509.Certificate, err error) {
 	sm := new(smPdu)
 	trailing, err := asn1.Unmarshal(smData, sm)
 	if err != nil {
@@ -41,6 +42,9 @@ func Decode(smData []byte, password string) (privateKey *sm2.PrivateKey, certifi
 	}
 
 	dBytes := DecryptSm2Key(password, sm.PrivContent.Content.Bytes)
+	if len(dBytes) == 0 {
+		return nil, nil, errors.New("密码错误")
+	}
 
 	cer, err := x509.ParseCertificate(sm.PubContent.Content.Bytes)
 	if err != nil {
@@ -54,9 +58,6 @@ func Decode(smData []byte, password string) (privateKey *sm2.PrivateKey, certifi
 		PublicKey: *pub,
 		D:         new(big.Int).SetBytes(dBytes),
 	}
-
-	fmt.Println(cer.Issuer)
-
 	return priv, cer, nil
 }
 
@@ -97,8 +98,25 @@ func DecryptSm2Key(password string, encryptedData []byte) []byte {
 
 		d := new(big.Int)
 		d.SetBytes(out)
-		fmt.Println(d)
 		return out
 	}
 	return nil
+}
+
+func GetPrivateKeyFromSm2File(file, password string) (*sm2.PrivateKey, error) {
+	open, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	smData, err := ioutil.ReadAll(open)
+	if err != nil {
+		return nil, err
+	}
+	b, err := base64.StdEncoding.DecodeString(string(smData))
+	if err != nil {
+		return nil, err
+	}
+
+	privateKey, _, err := DecodeSm2(b, password)
+	return privateKey, err
 }

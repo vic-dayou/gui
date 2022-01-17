@@ -18,14 +18,19 @@ var (
 			"Use Base64 encode/decode text.",
 			encodeTab,
 		},
-		"Sign": {"Sign",
-			"sign text.",
-			signTab,
+		"Verify": {"Verify",
+			"verify signature.",
+			verifyTab,
+		},
+		"Sign": {
+			"Sign",
+			"sign message",
+			singTab,
 		},
 	}
 
 	// TutorialIndex  defines how our tutorials should be laid out in the index tree
 	TutorialIndex = map[string][]string{
-		"": {"Base64", "Sign"},
+		"": {"Base64", "Verify", "Sign"},
 	}
 )

@@ -14,16 +14,16 @@ var (
 	// Tutorials defines the metadata for each tutorial
 	Tutorials = map[string]Tutorial{
 
-		"Base64": {"Encode/Decode",
+		"Base64": {"编解码",
 			"Use Base64 encode/decode text.",
 			encodeTab,
 		},
-		"Verify": {"Verify",
+		"Verify": {"验签",
 			"verify signature.",
 			verifyTab,
 		},
 		"Sign": {
-			"Sign",
+			"签名",
 			"sign message",
 			singTab,
 		},

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
@@ -16,8 +17,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"gui/crypto/pfx"
 	"gui/crypto/pkcs12"
-	"gui/crypto/sm2"
-	"gui/crypto/x509"
 	"gui/data"
 	"gui/data/password"
 	layout2 "gui/layout"
@@ -25,13 +24,6 @@ import (
 	"strings"
 	"time"
 )
-
-var rsaKey *rsa.PublicKey
-var smKey *sm2.PublicKey
-
-func init() {
-	loadPublicKey()
-}
 
 func encodeTab(_ fyne.Window) fyne.CanvasObject {
 
@@ -43,11 +35,11 @@ func encodeTab(_ fyne.Window) fyne.CanvasObject {
 
 	output := widget.NewMultiLineEntry()
 	output.Disable()
-	enc := widget.NewButton("Encode", func() {
+	enc := widget.NewButton("编码", func() {
 		output.SetText(base64.StdEncoding.EncodeToString([]byte(input.Text)))
 	})
 
-	dec := widget.NewButton("Decode", func() {
+	dec := widget.NewButton("解码", func() {
 		text, err := base64.StdEncoding.DecodeString(input.Text)
 		if err != nil {
 			log.Println(err)
@@ -68,10 +60,14 @@ func encodeTab(_ fyne.Window) fyne.CanvasObject {
 
 func verifyTab(win fyne.Window) fyne.CanvasObject {
 	sign := widget.NewMultiLineEntry()
-	sign.SetPlaceHolder("Please input signature. Support RSA and SM.")
+	sign.SetPlaceHolder("请输入签名值，支持SM2和RSA签名")
+	sign.Wrapping = fyne.TextWrapBreak
+	sign.Resize(fyne.NewSize(512, 150))
 
 	msg := widget.NewMultiLineEntry()
-	msg.SetPlaceHolder("Please input message.")
+	msg.SetPlaceHolder("请输入Base64后的请求报文")
+	msg.Wrapping = fyne.TextWrapBreak
+	msg.Resize(fyne.NewSize(512, 150))
 	radio := widget.NewRadioGroup([]string{"RSA", "SM"}, func(s string) {
 		if s == "RSA" {
 
@@ -84,54 +80,63 @@ func verifyTab(win fyne.Window) fyne.CanvasObject {
 	radio.Horizontal = true
 	radio.SetSelected("SM")
 	cradio := container.NewCenter(radio)
-	var resMsg = "验签成功"
-	var res = true
+	var resMsg = "验签失败"
+	var res = false
 
 	button := widget.NewButton("验证", func() {
 		defer showDialog(&res, &resMsg, win)
 		if sign.Text != "" && msg.Text != "" {
 			if radio.Selected == "RSA" {
 				hash := sha1.New()
-
-				s, err := hex.DecodeString(sign.Text)
+				s, err := hex.DecodeString(strings.Trim(strings.Trim(sign.Text, "\r\n"), " "))
 				if err != nil {
 					res = false
 					resMsg = "signature is invalid."
 					return
 				}
 
-				m, err := base64.StdEncoding.DecodeString(msg.Text)
+				m, err := base64.StdEncoding.DecodeString(strings.Trim(msg.Text, " "))
 				if err != nil {
 					res = false
 					resMsg = "message is invalid."
 					return
 				}
 				hash.Write(m)
+				for sn, key := range data.RSAPool {
+					err = rsa.VerifyPKCS1v15(key, crypto.SHA1, hash.Sum(nil), s)
+					if err == nil {
+						res = true
+						resMsg = fmt.Sprintf("使用SN:%s的证书验签成功.", sn)
+						return
+					}
 
-				err = rsa.VerifyPKCS1v15(rsaKey, crypto.SHA1, hash.Sum(nil), s)
-				if err != nil {
-					res = false
-					resMsg = "验签失败"
 				}
+
 			} else if radio.Selected == "SM" {
-				s, err := hex.DecodeString(sign.Text)
+				//log.Println(strings.Trim(strings.Trim(sign.Text,"\r\n")," "))
+
+				s, err := hex.DecodeString(strings.Trim(strings.Trim(sign.Text, "\r\n"), " "))
 				if err != nil {
 					res = false
 					resMsg = "signature is invalid."
 					return
 				}
 
-				m, err := base64.StdEncoding.DecodeString(msg.Text)
+				m, err := base64.StdEncoding.DecodeString(strings.Trim(msg.Text, " "))
 				if err != nil {
 					res = false
 					resMsg = "message is invalid."
 					return
 				}
 
-				verified := smKey.Verify(m, s)
-				if !verified {
-					res = false
-					resMsg = "验签失败"
+				for sn, key := range data.SM2Pool {
+					verified := key.Verify(m, s)
+					if verified {
+						res = true
+						resMsg = fmt.Sprintf("使用SN:%s的证书验签成功.", sn)
+						return
+					}
+
 				}
 
 			}
@@ -236,27 +241,73 @@ func sign(path, password, msg string) (string, error) {
 	}
 }
 
+func sendMsg(win fyne.Window) fyne.CanvasObject {
+	msg := widget.NewMultiLineEntry()
+	msg.SetPlaceHolder("请输入XML格式的请求报文")
+	msg.Resize(fyne.NewSize(512, 150))
+	input := widget.NewEntry()
+	input.Disable()
+	selectFile := widget.NewButton("选择私钥", func() {
+		f := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if reader != nil {
+				input.SetText(reader.URI().Path())
+			} else {
+				input.SetText("")
+			}
+		}, win)
+		f.SetFilter(storage.NewExtensionFileFilter([]string{".sm2", ".pfx"}))
+		f.Show()
+	})
+
+	file := container.New(layout2.NewHBoxLayout(), selectFile, input)
+
+	output := widget.NewMultiLineEntry()
+	output.SetPlaceHolder("Output signature.")
+	output.Resize(fyne.NewSize(512, 200))
+
+	button := widget.NewButton("发送", func() {
+		if msg.Text == "" || input.Text == "" {
+			return
+		}
+		p := ""
+		if p = password.Get(input.Text); p != "" {
+			s, err := sign(input.Text, p, msg.Text)
+			if err != nil {
+				output.SetText(err.Error())
+			}
+			send(s, msg.Text, "")
+		} else {
+			passwordItem := widget.NewFormItem("密码", widget.NewPasswordEntry())
+			passwordDialog := dialog.NewForm("请输入私钥密码", "确认", "取消", []*widget.FormItem{passwordItem}, func(b bool) {
+				if !b {
+					return
+				}
+				p = passwordItem.Widget.(*widget.Entry).Text
+				s, err := sign(input.Text, p, msg.Text)
+				if err != nil {
+					output.SetText(err.Error())
+				}
+				output.SetText(s)
+				password.Put(&password.Password{
+					K:          input.Text,
+					V:          p,
+					ExpireTime: time.Now().Unix(),
+				})
+
+			}, win)
+			passwordDialog.Resize(fyne.NewSize(250, 150))
+			passwordDialog.Show()
+		}
+
+	})
+
+	return container.NewVBox(msg, file, button, output)
+}
+
 func showDialog(res *bool, msg *string, win fyne.Window) {
 	if *res {
 		dialog.ShowInformation("验签结果", *msg, win)
 	} else {
 		dialog.ShowError(errors.New(*msg), win)
 	}
-}
-
-func loadPublicKey() {
-	rsaCer, err := x509.ParseCertificate(data.GetPemBytes("RSA"))
-	if err != nil {
-		log.Println(err)
-	}
-
-	rsaKey = rsaCer.PublicKey.(*rsa.PublicKey)
-
-	sm2Cer, err := x509.ParseCertificate(data.GetPemBytes("SM"))
-	if err != nil {
-		log.Println(err)
-	}
-
-	smKey = sm2Cer.PublicKey.(*sm2.PublicKey)
-
 }

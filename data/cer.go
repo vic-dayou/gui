@@ -1,9 +1,83 @@
 package data
 
-import "encoding/pem"
+import (
+	"crypto/rsa"
+	"encoding/pem"
+	"gui/crypto/sm2"
+	"gui/crypto/x509"
+	"log"
+	"math/big"
+	"strings"
+)
 
-const (
-	rsa = `-----BEGIN CERTIFICATE-----
+var (
+	RSAPool map[string]*rsa.PublicKey
+	RSACer  []string
+	SM2Pool map[string]*sm2.PublicKey
+	SM2Cer  []string
+)
+
+func init() {
+	defineCer()
+	initRSAPool()
+	initSM2Pool()
+}
+
+func initRSAPool() {
+	for _, v := range RSACer {
+		block, _ := pem.Decode([]byte(v))
+		certificate, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			log.Println("初始化测试环境rsa证书失败...")
+			log.Fatalln(err)
+		}
+		sn := transferSerialNumber(certificate.SerialNumber)
+		if RSAPool == nil {
+			RSAPool = make(map[string]*rsa.PublicKey)
+
+		}
+		RSAPool[sn] = certificate.PublicKey.(*rsa.PublicKey)
+	}
+
+}
+
+func initSM2Pool() {
+	for _, v := range SM2Cer {
+		block, _ := pem.Decode([]byte(v))
+		certificate, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			log.Println("初始化测试环境sm2证书失败...")
+			log.Fatalln(err)
+		}
+		sn := transferSerialNumber(certificate.SerialNumber)
+		if SM2Pool == nil {
+			SM2Pool = make(map[string]*sm2.PublicKey)
+
+		}
+		SM2Pool[sn] = certificate.PublicKey.(*sm2.PublicKey)
+	}
+
+}
+
+func transferSerialNumber(sn *big.Int) string {
+	data := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"}
+	if sn == nil {
+		return ""
+	} else {
+		sbBytes := sn.Bytes()
+		var sb strings.Builder
+		for _, v := range sbBytes {
+			i := v & 255
+			sb.WriteString(data[i>>4])
+			sb.WriteString(data[i&15])
+		}
+		return sb.String()
+	}
+}
+
+func defineCer() {
+	RSACer = []string{
+		`-----BEGIN CERTIFICATE-----
 MIIDrTCCAxagAwIBAgIQKYs1sciDjU/yBDKECiqedDANBgkqhkiG9w0BAQUFADAk
 MQswCQYDVQQGEwJDTjEVMBMGA1UEChMMQ0ZDQSBURVNUIENBMB4XDTEyMDgyODAy
 NTc1N1oXDTE0MDYyODAyNTc1N1owczELMAkGA1UEBhMCQ04xFTATBgNVBAoTDENG
@@ -24,8 +98,35 @@ amVjdGNsYXNzPWNSTERpc3RyaWJ1dGlvblBvaW50MA0GCSqGSIb3DQEBBQUAA4GB
 ANhD7dsg+uQMBuAcewdtbViOXCZCqXeFw0ZicZq0zkVA+NdjrejEWgcS2S1lNqYY
 VDnyTIghECm6UxGO4UEF8/nwYsYpQJKtpdjHGbiDVvja/xcNaGCaH+ER+n08uAdB
 ikahaQLV1atGk63K701Jtj061/jqkF2/Drv6FY+Uy+Rn
------END CERTIFICATE-----`
-	sm2 = `-----BEGIN CERTIFICATE-----
+-----END CERTIFICATE-----`,
+		`-----BEGIN CERTIFICATE-----
+MIIEKDCCAxCgAwIBAgIFEiIVkwcwDQYJKoZIhvcNAQEFBQAwITELMAkGA1UEBhMC
+Q04xEjAQBgNVBAoTCUNGQ0EgT0NBMTAeFw0xOTAyMTgwNzE5MzFaFw0yNDAyMTgw
+NzE5MzFaMIGTMQswCQYDVQQGEwJjbjESMBAGA1UEChMJQ0ZDQSBPQ0ExMRYwFAYD
+VQQLEw1DaGluYUNsZWFyaW5nMRQwEgYDVQQLEwtFbnRlcnByaXNlczFCMEAGA1UE
+Aww5MDQxQE45MTExMDEwMjU1MTQ0MzA3OFFA5Lit6YeR5pSv5LuY5pyJ6ZmQ5YWs
+5Y+4QDAwMDAwMDA3MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtnWh
+piUz2Vxs42QsgMBFzszI9PYvYZjk9PUvD2cxzjSbttO6iEAc1D0phFw4s+bPLhlW
+++88Sn0eE5o4koDzNAKdiYLqlmiVBNbAyRuXubQsa1S08m995rOIXqzDJlW1lbQq
+RSUqEA/M81P2l1a8nk/SQcKFz/efeopWgoS4aMXhD081ghFJ6aHfMLO4ZiG775/H
+fkD2TwcZuY+5OkUfg/Iv2O6gHqPrVYK6BV9Pe5Uofq6Xo2cJEzsS8kSV+G2czUhF
+NNlv6jEaklw87HlpFxnJynYJH5U38002aiFZwZNsDLzEbsRmHhrFFHf7yBJsUYgQ
+M4U1eD8CMhkpgFsvhwIDAQABo4HzMIHwMB8GA1UdIwQYMBaAFNHb6YiC5d0aj0yq
+AIy+fPKrG/bZMEgGA1UdIARBMD8wPQYIYIEchu8qAQEwMTAvBggrBgEFBQcCARYj
+aHR0cDovL3d3dy5jZmNhLmNvbS5jbi91cy91cy0xNC5odG0wOAYDVR0fBDEwLzAt
+oCugKYYnaHR0cDovL2NybC5jZmNhLmNvbS5jbi9SU0EvY3JsMTg5OTcuY3JsMAsG
+A1UdDwQEAwID6DAdBgNVHQ4EFgQUxw5uWup5Um4WN1A+bCCmUtweUA8wHQYDVR0l
+BBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMEMA0GCSqGSIb3DQEBBQUAA4IBAQCFgynm
+E+0eLZ9qP3ZJ4l1UgR/70VK2kPnUWTRb+n5qwRdRsUa0xUiDgw3Z/uPamp75u+4B
+/IC4Rf98t/e2u45I4mBRmHKQvmHoNZC7hj8EPCm7qGGK4ShO4ENU2xwOMlqh3VQE
+dCq8KV0Asr5eld4gEH6ZGE7jHrd6+TVxr1XV0bugF0jw+vj4GUadURRhuA9G1qJT
+wX1u9ICKC8VxtWZp2Jeb99S1mxergRHPTxycTJ3WrLivD6Vw3KWLmT4SUglJypm5
+HqYLoPGR2bt2yw2f1m+bd0g2xZCWW76HuGyz7gG9L+ncVrLBLAnCd3oCC5YxqS1c
+y0CR3Gd6glnEdJ34
+-----END CERTIFICATE-----`,
+	}
+
+	SM2Cer = []string{`-----BEGIN CERTIFICATE-----
 MIICozCCAkagAwIBAgIFEnhzM2YwDAYIKoEcz1UBg3UFADAlMQswCQYDVQQGEwJD
 TjEWMBQGA1UECgwNQ0ZDQSBTTTIgT0NBMTAeFw0yMDAzMDkwNjUzNDRaFw0yNTAz
 MDYwOTIwNDNaMIGHMQswCQYDVQQGEwJjbjESMBAGA1UECgwJQ0ZDQSBPQ0ExMRYw
@@ -41,15 +142,23 @@ MB0GA1UdDgQWBBQrOuTY4sl36EtW35vOBQMCECUEhjAdBgNVHSUEFjAUBggrBgEF
 BQcDAgYIKwYBBQUHAwQwDAYIKoEcz1UBg3UFAANJADBGAiEAtmoVfmY4TFzJ6jfI
 r3J+b8wdnl7FjwS82PeMi2OekPICIQCjl8EnBrWrMbFuLkLFG5E/qCtlRrqqYFbQ
 ulvPhQjuFQ==
------END CERTIFICATE-----`
-)
-
-func GetPemBytes(t string) []byte {
-	if t == "SM" {
-		b, _ := pem.Decode([]byte(sm2))
-		return b.Bytes
-	} else {
-		b, _ := pem.Decode([]byte(rsa))
-		return b.Bytes
+-----END CERTIFICATE-----`,
+		`-----BEGIN CERTIFICATE-----
+MIICrTCCAlKgAwIBAgIFEniYgEAwDAYIKoEcz1UBg3UFADAlMQswCQYDVQQGEwJD
+TjEWMBQGA1UECgwNQ0ZDQSBTTTIgT0NBMTAeFw0yMDAzMTEwNzUxMjRaFw0yNTAz
+MTEwNzUxMjRaMIGTMQswCQYDVQQGEwJjbjESMBAGA1UECgwJQ0ZDQSBPQ0ExMRYw
+FAYDVQQLDA1DaGluYUNsZWFyaW5nMRQwEgYDVQQLDAtFbnRlcnByaXNlczFCMEAG
+A1UEAww5MDQxQE45MTExMDEwMjU1MTQ0MzA3OFFA5Lit6YeR5pSv5LuY5pyJ6ZmQ
+5YWs5Y+4QDAwMDAwMDEyMFkwEwYHKoZIzj0CAQYIKoEcz1UBgi0DQgAEDBBwCLK5
+fLkH7csPoqoODpxNDeA//HUT0LExEDEIBPeHdo/P4fBol/5dSARQpOG8KITblQX0
+XqZkqdAJb6MrCqOB/TCB+jAfBgNVHSMEGDAWgBRck1ggWiRzVhAbZFAQ7OmnygdB
+ETAJBgNVHRMEAjAAMEgGA1UdIARBMD8wPQYIYIEchu8qAQEwMTAvBggrBgEFBQcC
+ARYjaHR0cDovL3d3dy5jZmNhLmNvbS5jbi91cy91cy0xNC5odG0wNwYDVR0fBDAw
+LjAsoCqgKIYmaHR0cDovL2NybC5jZmNhLmNvbS5jbi9TTTIvY3JsNDM4Ny5jcmww
+CwYDVR0PBAQDAgPoMB0GA1UdDgQWBBRV/nxmmpsdQ4RhFkDE04GMBmlL5DAdBgNV
+HSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwQwDAYIKoEcz1UBg3UFAANHADBEAiAh
+sALC2z/XpPVfMMVSgYnR461h5EQkcimHJ/YjGP2JEAIgRJUtvzJ8KhGvIvjmTdDj
+igQn2ghH8QlvH3aDq1VuyEk=
+-----END CERTIFICATE-----`,
 	}
 }

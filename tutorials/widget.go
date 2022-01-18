@@ -19,6 +19,7 @@ import (
 	"gui/crypto/pkcs12"
 	"gui/data"
 	"gui/data/password"
+	"gui/httpclient"
 	layout2 "gui/layout"
 	"log"
 	"strings"
@@ -270,12 +271,28 @@ func sendMsg(win fyne.Window) fyne.CanvasObject {
 			return
 		}
 		p := ""
+		message := base64.StdEncoding.EncodeToString([]byte(msg.Text))
 		if p = password.Get(input.Text); p != "" {
 			s, err := sign(input.Text, p, msg.Text)
 			if err != nil {
 				output.SetText(err.Error())
 			}
-			send(s, msg.Text, "")
+			params := []httpclient.NameValuePair{{
+				Key:   "message",
+				Value: message,
+			},
+				{
+					Key:   "signature",
+					Value: s,
+				},
+			}
+
+			body, err := httpclient.Post(params, "https://www.china-clearing.com/Gateway/InterfaceII")
+			if err != nil {
+				output.SetText(err.Error())
+				return
+			}
+			output.SetText(string(body))
 		} else {
 			passwordItem := widget.NewFormItem("密码", widget.NewPasswordEntry())
 			passwordDialog := dialog.NewForm("请输入私钥密码", "确认", "取消", []*widget.FormItem{passwordItem}, func(b bool) {

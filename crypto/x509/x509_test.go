@@ -19,12 +19,11 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
+	"gui/crypto/sm2"
 	"math/big"
 	"net"
 	"testing"
 	"time"
-
-	"ecc/sm2"
 )
 
 func TestX509(t *testing.T) {

@@ -22,6 +22,7 @@ func main() {
 
 	_ = os.Setenv("FYNE_FONT", "D:\\Users\\project\\SourceHanSerifCN-SemiBold.ttf")
 	loadui()
+
 }
 
 func loadui() {

@@ -10,3 +10,9 @@
 6.在项目目录执行下面的命令 windres -o main.syso main.rc ,此时生成了一个main.syso
 
 7.go build -ldfalgs -H="windowsgui" -o cpcn.exe .
+
+### 关于字体
+使用的是windows系统的`C:\Windows\Fonts\STKAITI.ttf`这个字体，即是`华文楷体`
+
+### 关于验签
+内置了四个公钥证书，分别为测试环境RSA和SM2证书及生产环境RSA和SM2证书

@@ -184,7 +184,6 @@ func singTab(win fyne.Window) fyne.CanvasObject {
 		if msg.Text == "" || input.Text == "" {
 			return
 		}
-
 		// 如果密码记录为空，则提示输入密码
 		pwd = password.Get(input.Text)
 		index := strings.Index(input.Text, ".")
@@ -315,6 +314,16 @@ func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 		f.SetFilter(storage.NewExtensionFileFilter([]string{".sm2", ".pfx"}))
 		f.Show()
 	})
+	urlLabel := widget.NewLabel("请求地址")
+	urlEntry := widget.NewEntry()
+	urlEntry.SetText("https://test.cpcn.com.cn/Gateway/InterfaceII")
+	urlEntry.OnChanged = func(s string) {
+		if s == "" {
+			urlEntry.SetText("https://test.cpcn.com.cn/Gateway/InterfaceII")
+		}
+	}
+
+	urlContent := container.New(layout2.NewHBoxLayout(), urlLabel, urlEntry)
 
 	file := container.New(layout2.NewHBoxLayout(), selectFile, input)
 
@@ -326,7 +335,6 @@ func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 		if msg.Text == "" || input.Text == "" {
 			return
 		}
-
 		// 如果密码记录为空，则提示输入密码
 		pwd = password.Get(input.Text)
 		index := strings.Index(input.Text, ".")
@@ -349,25 +357,17 @@ func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 				output.SetText(err.Error())
 				return
 			}
-			message := base64.StdEncoding.EncodeToString([]byte(msg.Text))
+			body, err := send(msg.Text, signature, urlEntry.Text)
 			if err != nil {
 				output.SetText(err.Error())
 				return
 			}
-			log.Println("message: ", message)
-			log.Println("signature: ", signature)
-			body, err := send(message, signature, "https://test.cpcn.com.cn/Gateway/InterfaceII")
-			if err != nil {
-				output.SetText(err.Error())
-				return
-			}
-			ssss, err := base64.StdEncoding.DecodeString(string(body))
-			output.SetText(string(ssss))
+			output.SetText(body)
 			password.Put(&password.Password{
 				K:          input.Text,
 				V:          pwds,
 				Ext:        ext,
-				Pk:         &privateKey,
+				Pk:         privateKey,
 				ExpireTime: time.Now().Unix(),
 			})
 
@@ -378,33 +378,33 @@ func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 			passwordDialog.Show()
 		} else {
 			signature, err := signByKey(ext, msg.Text, pwd.Pk)
-			message := base64.StdEncoding.EncodeToString([]byte(msg.Text))
+			body, err := send(msg.Text, signature, urlEntry.Text)
 			if err != nil {
 				output.SetText(err.Error())
 				return
 			}
-			log.Println("message: ", message)
-			log.Println("signature: ", signature)
-			body, err := send(message, signature, "https://test.cpcn.com.cn/Gateway/InterfaceII")
-			if err != nil {
-				output.SetText(err.Error())
-				return
-			}
-			ssss, err := base64.StdEncoding.DecodeString(string(body))
-			output.SetText(string(ssss))
+			output.SetText(body)
 		}
 
 	})
 
-	return container.NewVBox(msg, file, button, output)
+	return container.NewVBox(msg, file, urlContent, button, output)
 }
 
-func send(message, signature, link string) ([]byte, error) {
+func send(message, signature, link string) (string, error) {
+	// 1. 对message进行base64编码
+	m := base64.StdEncoding.EncodeToString([]byte(message))
 	values := url.Values{}
-	values.Set("message", message)
+	values.Set("message", m)
 	values.Set("signature", signature)
 	body, err := httpclient.Post(values, link)
-	return body, err
+	// resp[0]:响应信息，resp[1]:签名
+	resp := strings.Split(string(body), ",")
+	if len(resp) != 2 {
+		return "", errors.New("响应信息非message,signature格式")
+	}
+	respText, _ := base64.StdEncoding.DecodeString(resp[0])
+	return string(respText), err
 }
 
 func showDialog(res *bool, msg *string, win fyne.Window) {

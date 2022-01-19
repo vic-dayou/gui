@@ -8,6 +8,8 @@ import (
 type Password struct {
 	K          string
 	V          string
+	Pk         interface{}
+	Ext        string
 	ExpireTime int64
 }
 
@@ -17,15 +19,15 @@ func init() {
 	pmap = make(map[string]*Password)
 }
 
-func Get(k string) string {
+func Get(k string) *Password {
 	if s, ok := pmap[k]; ok {
 		if s.ExpireTime <= time.Now().Unix() {
-			return s.V
+			return s
 		} else {
-			return ""
+			return nil
 		}
 	} else {
-		return ""
+		return nil
 	}
 }
 

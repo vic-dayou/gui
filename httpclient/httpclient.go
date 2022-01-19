@@ -2,17 +2,13 @@ package httpclient
 
 import (
 	"crypto/tls"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
-
-type NameValuePair struct {
-	Key, Value string
-}
 
 var client *http.Client
 
@@ -28,8 +24,8 @@ func init() {
 	client = &http.Client{Timeout: 60 * time.Second, Transport: t}
 }
 
-func Post(params []NameValuePair, url string) ([]byte, error) {
-	response, err := client.Post(url, xWWWFormUrlEncoded, strings.NewReader(buildParameter(params)))
+func Post(values url.Values, link string) ([]byte, error) {
+	response, err := client.Post(link, xWWWFormUrlEncoded, strings.NewReader(values.Encode()))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,15 +42,4 @@ func Post(params []NameValuePair, url string) ([]byte, error) {
 
 func Get() {
 
-}
-
-func buildParameter(params []NameValuePair) string {
-	var sb strings.Builder
-	for i, v := range params {
-		sb.WriteString(fmt.Sprintf("%s=%s", v.Key, v.Value))
-		if i < len(params)-1 {
-			sb.WriteString("&")
-		}
-	}
-	return sb.String()
 }

@@ -17,11 +17,14 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"gui/crypto/pfx"
 	"gui/crypto/pkcs12"
+	"gui/crypto/sm2"
 	"gui/data"
 	"gui/data/password"
 	"gui/httpclient"
 	layout2 "gui/layout"
+	"io/ioutil"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -156,10 +159,13 @@ func singTab(win fyne.Window) fyne.CanvasObject {
 	msg.Resize(fyne.NewSize(512, 150))
 	input := widget.NewEntry()
 	input.Disable()
+	var pwd *password.Password
+	var reader fyne.URIReadCloser
 	selectFile := widget.NewButton("选择私钥", func() {
-		f := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
-			if reader != nil {
-				input.SetText(reader.URI().Path())
+		f := dialog.NewFileOpen(func(r fyne.URIReadCloser, err error) {
+			if r != nil {
+				input.SetText(r.URI().Path())
+				reader = r
 			} else {
 				input.SetText("")
 			}
@@ -178,30 +184,55 @@ func singTab(win fyne.Window) fyne.CanvasObject {
 		if msg.Text == "" || input.Text == "" {
 			return
 		}
-		p := ""
-		if p = password.Get(input.Text); p != "" {
-			sign(input.Text, p, msg.Text)
-		} else {
-			passwordItem := widget.NewFormItem("密码", widget.NewPasswordEntry())
-			passwordDialog := dialog.NewForm("请输入私钥密码", "确认", "取消", []*widget.FormItem{passwordItem}, func(b bool) {
+
+		// 如果密码记录为空，则提示输入密码
+		pwd = password.Get(input.Text)
+		index := strings.Index(input.Text, ".")
+		ext := input.Text[index:]
+		passwordItem := widget.NewFormItem("密码", widget.NewPasswordEntry())
+		passwordDialog := dialog.NewForm("请输入私钥密码", "确认", "取消", []*widget.FormItem{passwordItem},
+			func(b bool) {
 				if !b {
 					return
 				}
-				p = passwordItem.Widget.(*widget.Entry).Text
-				s, err := sign(input.Text, p, msg.Text)
+				pwds := passwordItem.Widget.(*widget.Entry).Text
+				bytes, err := ioutil.ReadAll(reader)
+				if err != nil || len(bytes) == 0 {
+					output.SetText("读取文件失败")
+					return
+				}
+				privateKey, err := pkcs12.GetPrivateKeyFromBytes(bytes, ext, pwds)
+
 				if err != nil {
 					output.SetText(err.Error())
+					return
 				}
-				output.SetText(s)
+				signature, err := signByKey(ext, msg.Text, privateKey)
+				if err != nil {
+					output.SetText(err.Error())
+					return
+				}
+				output.SetText(signature)
 				password.Put(&password.Password{
 					K:          input.Text,
-					V:          p,
+					V:          pwds,
+					Ext:        ext,
+					Pk:         privateKey,
 					ExpireTime: time.Now().Unix(),
 				})
-
 			}, win)
-			passwordDialog.Resize(fyne.NewSize(250, 150))
+		passwordDialog.Resize(fyne.NewSize(250, 150))
+		//passwordDialog.Show()
+		if pwd == nil {
 			passwordDialog.Show()
+		} else {
+			passwordDialog.Hide()
+			signature, err := signByKey(ext, msg.Text, pwd.Pk)
+			if err != nil {
+				output.SetText(err.Error())
+				return
+			}
+			output.SetText(signature)
 		}
 
 	})
@@ -241,17 +272,42 @@ func sign(path, password, msg string) (string, error) {
 		return "", errors.New("私钥文件不正确")
 	}
 }
+func signByKey(ext, msg string, priv interface{}) (string, error) {
+	if ext == ".sm2" {
+		privateKey := priv.(*sm2.PrivateKey)
+		signature, err := privateKey.Sign(rand.Reader, []byte(msg), nil)
+		if err != nil {
+			return "", err
+		}
+		return hex.EncodeToString(signature), nil
+	} else if ext == ".pfx" {
+		privateKey := priv.(*rsa.PrivateKey)
+		hash := sha1.New()
+		hash.Write([]byte(msg))
 
-func sendMsg(win fyne.Window) fyne.CanvasObject {
+		signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA1, hash.Sum(nil))
+		if err != nil {
+			return "", err
+		}
+		return hex.EncodeToString(signature), nil
+	} else {
+		return "", errors.New("签名失败")
+	}
+}
+
+func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 	msg := widget.NewMultiLineEntry()
 	msg.SetPlaceHolder("请输入XML格式的请求报文")
 	msg.Resize(fyne.NewSize(512, 150))
 	input := widget.NewEntry()
 	input.Disable()
+	var pwd *password.Password
+	var reader fyne.URIReadCloser
 	selectFile := widget.NewButton("选择私钥", func() {
-		f := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
-			if reader != nil {
-				input.SetText(reader.URI().Path())
+		f := dialog.NewFileOpen(func(r fyne.URIReadCloser, err error) {
+			if r != nil {
+				input.SetText(r.URI().Path())
+				reader = r
 			} else {
 				input.SetText("")
 			}
@@ -270,55 +326,85 @@ func sendMsg(win fyne.Window) fyne.CanvasObject {
 		if msg.Text == "" || input.Text == "" {
 			return
 		}
-		p := ""
-		message := base64.StdEncoding.EncodeToString([]byte(msg.Text))
-		if p = password.Get(input.Text); p != "" {
-			s, err := sign(input.Text, p, msg.Text)
-			if err != nil {
-				output.SetText(err.Error())
-			}
-			params := []httpclient.NameValuePair{{
-				Key:   "message",
-				Value: message,
-			},
-				{
-					Key:   "signature",
-					Value: s,
-				},
-			}
 
-			body, err := httpclient.Post(params, "https://www.china-clearing.com/Gateway/InterfaceII")
+		// 如果密码记录为空，则提示输入密码
+		pwd = password.Get(input.Text)
+		index := strings.Index(input.Text, ".")
+		ext := input.Text[index:]
+
+		passwordItem := widget.NewFormItem("密码", widget.NewPasswordEntry())
+		passwordDialog := dialog.NewForm("请输入私钥密码", "确认", "取消", []*widget.FormItem{passwordItem}, func(b bool) {
+			if !b {
+				return
+			}
+			pwds := passwordItem.Widget.(*widget.Entry).Text
+			bytes, err := ioutil.ReadAll(reader)
+			privateKey, err := pkcs12.GetPrivateKeyFromBytes(bytes, ext, pwds)
 			if err != nil {
 				output.SetText(err.Error())
 				return
 			}
-			output.SetText(string(body))
-		} else {
-			passwordItem := widget.NewFormItem("密码", widget.NewPasswordEntry())
-			passwordDialog := dialog.NewForm("请输入私钥密码", "确认", "取消", []*widget.FormItem{passwordItem}, func(b bool) {
-				if !b {
-					return
-				}
-				p = passwordItem.Widget.(*widget.Entry).Text
-				s, err := sign(input.Text, p, msg.Text)
-				if err != nil {
-					output.SetText(err.Error())
-				}
-				output.SetText(s)
-				password.Put(&password.Password{
-					K:          input.Text,
-					V:          p,
-					ExpireTime: time.Now().Unix(),
-				})
+			signature, err := signByKey(ext, msg.Text, privateKey)
+			if err != nil {
+				output.SetText(err.Error())
+				return
+			}
+			message := base64.StdEncoding.EncodeToString([]byte(msg.Text))
+			if err != nil {
+				output.SetText(err.Error())
+				return
+			}
+			log.Println("message: ", message)
+			log.Println("signature: ", signature)
+			body, err := send(message, signature, "https://test.cpcn.com.cn/Gateway/InterfaceII")
+			if err != nil {
+				output.SetText(err.Error())
+				return
+			}
+			ssss, err := base64.StdEncoding.DecodeString(string(body))
+			output.SetText(string(ssss))
+			password.Put(&password.Password{
+				K:          input.Text,
+				V:          pwds,
+				Ext:        ext,
+				Pk:         &privateKey,
+				ExpireTime: time.Now().Unix(),
+			})
 
-			}, win)
-			passwordDialog.Resize(fyne.NewSize(250, 150))
+		}, win)
+		passwordDialog.Resize(fyne.NewSize(250, 150))
+
+		if pwd == nil {
 			passwordDialog.Show()
+		} else {
+			signature, err := signByKey(ext, msg.Text, pwd.Pk)
+			message := base64.StdEncoding.EncodeToString([]byte(msg.Text))
+			if err != nil {
+				output.SetText(err.Error())
+				return
+			}
+			log.Println("message: ", message)
+			log.Println("signature: ", signature)
+			body, err := send(message, signature, "https://test.cpcn.com.cn/Gateway/InterfaceII")
+			if err != nil {
+				output.SetText(err.Error())
+				return
+			}
+			ssss, err := base64.StdEncoding.DecodeString(string(body))
+			output.SetText(string(ssss))
 		}
 
 	})
 
 	return container.NewVBox(msg, file, button, output)
+}
+
+func send(message, signature, link string) ([]byte, error) {
+	values := url.Values{}
+	values.Set("message", message)
+	values.Set("signature", signature)
+	body, err := httpclient.Post(values, link)
+	return body, err
 }
 
 func showDialog(res *bool, msg *string, win fyne.Window) {

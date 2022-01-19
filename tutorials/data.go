@@ -27,10 +27,15 @@ var (
 			"sign message",
 			singTab,
 		},
+		"SendRequest": {
+			"模拟请求",
+			"请求测试环境",
+			sendMsgTab,
+		},
 	}
 
 	// TutorialIndex  defines how our tutorials should be laid out in the index tree
 	TutorialIndex = map[string][]string{
-		"": {"Base64", "Verify", "Sign"},
+		"": {"Base64", "Verify", "Sign", "SendRequest"},
 	}
 )

@@ -4,6 +4,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"errors"
+	"golang.org/x/crypto/pkcs12"
 	"gui/crypto/sm2"
 	"gui/crypto/sm3"
 	"gui/crypto/sm4"
@@ -119,4 +120,28 @@ func GetPrivateKeyFromSm2File(file, password string) (*sm2.PrivateKey, error) {
 
 	privateKey, _, err := DecodeSm2(b, password)
 	return privateKey, err
+}
+
+func GetPrivateKeyFromBytes(data []byte, ext, password string) (interface{}, error) {
+	b, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return nil, err
+	}
+	if ext == ".sm2" {
+		privateKey, _, err := DecodeSm2(b, password)
+		return privateKey, err
+	} else if ext == ".pfx" {
+		blocks, err := pkcs12.ToPEM(data, password)
+		if err != nil {
+			return nil, err
+		}
+
+		privateKey, err := x509.ParsePKCS1PrivateKey(blocks[0].Bytes)
+		if err != nil {
+			return nil, err
+		}
+		return privateKey, nil
+	} else {
+		return nil, errors.New("文件格式错误")
+	}
 }

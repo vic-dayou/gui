@@ -301,12 +301,12 @@ func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 	input := widget.NewEntry()
 	input.Disable()
 	var pwd *password.Password
-	var reader fyne.URIReadCloser
+	var data []byte
 	selectFile := widget.NewButton("选择私钥", func() {
 		f := dialog.NewFileOpen(func(r fyne.URIReadCloser, err error) {
 			if r != nil {
 				input.SetText(r.URI().Path())
-				reader = r
+				data, _ = ioutil.ReadAll(r)
 			} else {
 				input.SetText("")
 			}
@@ -328,7 +328,7 @@ func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 	file := container.New(layout2.NewHBoxLayout(), selectFile, input)
 
 	output := widget.NewMultiLineEntry()
-	output.SetPlaceHolder("Output signature.")
+	output.SetPlaceHolder("响应报文.")
 	output.Resize(fyne.NewSize(512, 200))
 
 	button := widget.NewButton("发送", func() {
@@ -346,8 +346,12 @@ func sendMsgTab(win fyne.Window) fyne.CanvasObject {
 				return
 			}
 			pwds := passwordItem.Widget.(*widget.Entry).Text
-			bytes, err := ioutil.ReadAll(reader)
-			privateKey, err := pkcs12.GetPrivateKeyFromBytes(bytes, ext, pwds)
+
+			if len(data) == 0 {
+				output.SetText("请重新选择私钥文件")
+				return
+			}
+			privateKey, err := pkcs12.GetPrivateKeyFromBytes(data, ext, pwds)
 			if err != nil {
 				output.SetText(err.Error())
 				return

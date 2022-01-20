@@ -20,8 +20,21 @@ var topWindow fyne.Window
 
 func main() {
 
-	_ = os.Setenv("FYNE_FONT", "C:\\Windows\\Fonts\\STKAITI.ttf")
+	fontDir := "C:\\Windows\\Fonts\\"
+
+	fonts := []string{"STKAITI.ttf", "simkai.ttf", "simfang.ttf", "STSONG.ttf", "simhei.ttf"}
+	for _, font := range fonts {
+		_, err := os.Stat(fontDir + font)
+		if err == nil {
+			_ = os.Setenv("FYNE_FONT", fontDir+font)
+			break
+		}
+		if os.IsNotExist(err) {
+			continue
+		}
+	}
 	loadui()
+
 	/*msg := "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxSZXNwb25zZSB2ZXJzaW9uPSIyLjAiPgo8SGVhZD4KPENvZGU+MjQwMDAyPC9Db2RlPgo8TWVzc2FnZT7ns7vnu5/kuK3kuI3lrZjlnKjmjIflrprnmoTmnLrmnoTvvIzmn6XnnIvlj4LmlbBJbnN0aXR1dGlvbklEPC9NZXNzYWdlPgo8L0hlYWQ+CjwvUmVzcG9uc2U+,2A44B0F9563FF4306BA5C1EF4B3DD40F2B9FEB9A1012570A852CCF5502A23526C48BA302A3A767A4A1C1856D6C16C2A3866E7D6582F2CDB00DB8A664ABF586BF8B193740076602C229A08549718D2012093E776BF16D86C38F463C5639C884F4D51B7B509DA1756D5EEE6164E7EF4BD5EA304F0F77B840D3651A5370BB233FC0ED1FE4F0E256F65D42633AB9120767ED44C234DC46738E3FD4AFA3298BAC2BB2FE2A10B93BE8AB54A3F66460A50D3BF1D5FBF4EDB6DB9C3B676C6C7835645F6A3774BD98E1801DDDF50BA7C39A7740E7F1408C96D2AF97DEB1A158DD9D1C3C548341938CE3E83CA4715602E1EC5356F7B2489E6680DA7ED87AEF62987FB596B6"
 	<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 	<Request version="2.1">
@@ -86,7 +99,7 @@ func loadui() {
 		split.Offset = 0.2
 		w.SetContent(split)
 	}
-	w.Resize(fyne.NewSize(640, 460))
+	w.Resize(fyne.NewSize(680, 500))
 	w.ShowAndRun()
 }
 

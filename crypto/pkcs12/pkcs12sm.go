@@ -123,16 +123,20 @@ func GetPrivateKeyFromSm2File(file, password string) (*sm2.PrivateKey, error) {
 }
 
 func GetPrivateKeyFromBytes(data []byte, ext, password string) (interface{}, error) {
-	b, err := base64.StdEncoding.DecodeString(string(data))
-	if err != nil {
-		return nil, err
-	}
 	if ext == ".sm2" {
+		b, err := base64.StdEncoding.DecodeString(string(data))
+		if err != nil {
+			return nil, err
+		}
 		privateKey, _, err := DecodeSm2(b, password)
 		return privateKey, err
 	} else if ext == ".pfx" {
 		blocks, err := pkcs12.ToPEM(data, password)
 		if err != nil {
+			if errors.Is(err, pkcs12.ErrIncorrectPassword) {
+				return nil, errors.New("密码错误")
+			}
+			log.Println(err)
 			return nil, err
 		}
 

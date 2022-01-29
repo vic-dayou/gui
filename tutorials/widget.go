@@ -15,12 +15,12 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
+	"gui/client/httpclient"
 	"gui/crypto/pfx"
 	"gui/crypto/pkcs12"
 	"gui/crypto/sm2"
 	"gui/data"
 	"gui/data/password"
-	"gui/httpclient"
 	layout2 "gui/layout"
 	"io/ioutil"
 	"log"
@@ -32,8 +32,11 @@ import (
 func encodeTab(_ fyne.Window) fyne.CanvasObject {
 
 	input := widget.NewMultiLineEntry()
-	input.SetPlaceHolder("Please past text...")
+	input.SetPlaceHolder("输入base64编码值...")
 	input.Wrapping = fyne.TextWrapBreak
+	input.OnChanged = func(s string) {
+		log.Println(s)
+	}
 
 	input.Resize(fyne.NewSize(512, 200))
 

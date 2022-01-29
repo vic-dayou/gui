@@ -126,7 +126,12 @@ func (g *boxLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 			}
 		} else {
 			y += theme.Padding() + height
-			child.Resize(fyne.NewSize(size.Width, height))
+			if index == len(objects)-1 {
+				child.Resize(fyne.NewSize(size.Width, size.Height-y+height))
+			} else {
+
+				child.Resize(fyne.NewSize(size.Width, height))
+			}
 		}
 	}
 }

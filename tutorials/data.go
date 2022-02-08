@@ -37,10 +37,15 @@ var (
 			"支持jpg,png,bmp格式",
 			imageBase64Tab,
 		},
+		"FileDownload": {
+			"文件下载",
+			"多协程下载文件",
+			downloadLogFile,
+		},
 	}
 
 	// TutorialIndex  defines how our tutorials should be laid out in the index tree
 	TutorialIndex = map[string][]string{
-		"": {"Base64", "Verify", "Sign", "SendRequest", "ImageBase64"},
+		"": {"Base64", "Verify", "Sign", "SendRequest", "ImageBase64", "FileDownload"},
 	}
 )
